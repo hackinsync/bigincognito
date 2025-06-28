@@ -6,12 +6,19 @@ edition = "2024_07"
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-openzeppelin = "0.20.0"
 starknet = "2.9.2"
+openzeppelin_access = "1.0.0"
+openzeppelin_token = "1.0.0"
+
+# OpenZeppelin Contracts for Cairo
+openzeppelin_access = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.14.0" }
+openzeppelin_security = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.14.0" }
+openzeppelin_token = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.14.0" }
 
 [dev-dependencies]
 snforge_std = "0.37.0"
 assert_macros = "2.9.2"
+openzeppelin_utils = "1.0.0"
 
 [[target.starknet-contract]]
 sierra = true

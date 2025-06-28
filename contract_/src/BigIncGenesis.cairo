@@ -1,13 +1,11 @@
 use starknet::ContractAddress;
 
+
 #[starknet::interface]
 trait IBigIncGenesis<TContractState> {
-    // Core functionality
     fn mint_share(ref self: TContractState, token_address: ContractAddress);
     fn transfer_share(ref self: TContractState, to: ContractAddress, share_amount: u256);
-    fn donate(ref self: TContractState, token_address: ContractAddress, amount: u256);
-
-    // View functions
+    fn donate(ref self: TContractState);
     fn get_available_shares(self: @TContractState) -> u256;
     fn get_shares(self: @TContractState, addr: ContractAddress) -> u256;
     fn get_shareholders(self: @TContractState) -> Array<ContractAddress>;
@@ -27,39 +25,74 @@ trait IBigIncGenesis<TContractState> {
     fn unpause(ref self: TContractState);
 
     // Ownable functions
-    fn get_owner(self: @TContractState) -> ContractAddress;
-    fn transfer_owner(ref self: TContractState, new_owner: ContractAddress);
-    fn renounce_owner(ref self: TContractState);
+    fn owner(self: @TContractState) -> ContractAddress;
+    fn transfer_ownership(ref self: TContractState, new_owner: ContractAddress);
+    fn renounce_ownership(ref self: TContractState);
 }
 
 #[starknet::contract]
 mod BigIncGenesis {
-    use openzeppelin::access::ownable::OwnableComponent;
-    use openzeppelin::security::pausable::PausableComponent;
-    use openzeppelin::security::reentrancyguard::ReentrancyGuardComponent;
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
-    };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use super::IBigIncGenesis;
+    use starknet::{
+        ContractAddress, get_caller_address, get_contract_address,
+        contract_address_const //call_contract_syscall, CallContractSyscall
+    };
+    use core::array::ArrayTrait;
+    use core::traits::{Into, TryInto};
+    use core::option::OptionTrait;
+    //use core::integer::BoundedInt;
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerWriteAccess,
+        StoragePointerReadAccess,
+    };
+    use openzeppelin_access::ownable::OwnableComponent;
+
+    // use openzeppelin::access::ownable::OwnableComponent;
+    // use openzeppelin::security::pausable::PausableComponent;
+    // use openzeppelin::security::reentrancyguard::ReentrancyGuardComponent;
+    // use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: PausableComponent, storage: pausable, event: PausableEvent);
-    component!(
-        path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent,
-    );
+    component!(path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent);
 
     #[abi(embed_v0)]
     impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
+    impl OwnableTwoStepMixinImpl = OwnableComponent::OwnableTwoStepMixinImpl<ContractState>;
+
+    #[abi(embed_v0)]
     impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
     impl PausableInternalImpl = PausableComponent::InternalImpl<ContractState>;
 
     impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
+
+
+
+    // #[storage]
+    // struct Storage {
+    //     owner: ContractAddress,
+    //     paused: bool,
+    //     // Reentrancy guard
+    //     entered: bool,
+    //     // Core contract state
+    //     is_shareholder_map: Map<ContractAddress, bool>,
+    //     usdt_address: ContractAddress,
+    //     usdc_address: ContractAddress,
+    //     total_share_valuation: u256,
+    //     presale_share_valuation: u256,
+    //     presale_shares: u256,
+    //     shares_sold: u256,
+    //     available_shares: u256,
+    //     is_presale_active: bool,
+    //     // Shareholder data
+    //     shareholders: Map<ContractAddress, u256>,
+    //     shareholder_addresses: Array<ContractAddress>,
+    //     shareholder_count: u32,
+    // }
 
     #[storage]
     struct Storage {
@@ -69,38 +102,36 @@ mod BigIncGenesis {
         pausable: PausableComponent::Storage,
         #[substorage(v0)]
         reentrancy_guard: ReentrancyGuardComponent::Storage,
-        // Token addresses
+
+        // Core contract state
+        is_shareholder_map: LegacyMap<ContractAddress, bool>,
         usdt_address: ContractAddress,
         usdc_address: ContractAddress,
-        // Share economics
         total_share_valuation: u256,
         presale_share_valuation: u256,
         presale_shares: u256,
         shares_sold: u256,
         available_shares: u256,
         is_presale_active: bool,
-        // Shareholder management
-        shareholders: Map<ContractAddress, u256>,
-        is_shareholder_map: Map<ContractAddress, bool>,
-        shareholder_addresses: Map<u32, ContractAddress>,
+        
+        // Shareholder data
+        shareholders: LegacyMap<ContractAddress, u256>,
+        shareholder_addresses: LegacyMap<u32, ContractAddress>,
         shareholder_count: u32,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
-        #[flat]
-        OwnableEvent: OwnableComponent::Event,
-        #[flat]
-        PausableEvent: PausableComponent::Event,
-        #[flat]
-        ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
         ShareMinted: ShareMinted,
         PresaleEnded: PresaleEnded,
         TransferShare: TransferShare,
         Donate: Donate,
         SharesSeized: SharesSeized,
         AllSharesSold: AllSharesSold,
+        OwnershipTransferred: OwnershipTransferred,
+        Paused: Paused,
+        Unpaused: Unpaused,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -127,7 +158,6 @@ mod BigIncGenesis {
     struct Donate {
         #[key]
         donor: ContractAddress,
-        token_address: ContractAddress,
         amount: u256,
     }
 
@@ -141,289 +171,92 @@ mod BigIncGenesis {
     #[derive(Drop, starknet::Event)]
     struct AllSharesSold {}
 
+    #[derive(Drop, starknet::Event)]
+    struct OwnershipTransferred {
+        #[key]
+        previous_owner: ContractAddress,
+        #[key]
+        new_owner: ContractAddress,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct Paused {
+        account: ContractAddress,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct Unpaused {
+        account: ContractAddress,
+    }
+
+
     #[constructor]
     fn constructor(
-        ref self: ContractState,
-        usdt_address: ContractAddress,
-        usdc_address: ContractAddress,
-        owner: ContractAddress,
+        ref self: ContractState, usdt_address: ContractAddress, usdc_address: ContractAddress,
     ) {
-        // Initialize components
-        self.ownable.initializer(owner);
+        let caller = get_caller_address();
+
+        // Initialize ownership
+        self.owner.write(caller);
+
+        // Initialize pausable state
+        self.paused.write(false);
+
+        // Initialize reentrancy guard
+        self.entered.write(false);
 
         // Set token addresses
         self.usdt_address.write(usdt_address);
         self.usdc_address.write(usdc_address);
 
         // Initialize share parameters
-        self.total_share_valuation.write(680000000000_u256); // $680k with 6 decimals
-        self.presale_share_valuation.write(457143000000_u256); // $457k with 6 decimals
+        self.total_share_valuation.write(680000000000_u256); // 680k with 6 decimals
+        self.presale_share_valuation.write(457143000000_u256); // 457k with 6 decimals
         self.presale_shares.write(21000000_u256); // 21% shares
         self.shares_sold.write(0_u256);
-        self.available_shares.write(82000000_u256); // 82% available after 18% to owner
+        self.available_shares.write(82000000_u256); // 82% available
         self.is_presale_active.write(true);
 
         // Assign 18% shares to owner
         let owner_shares = 18000000_u256;
-        self.shareholders.write(owner, owner_shares);
-        self.is_shareholder_map.write(owner, true);
-        self.shareholder_addresses.write(0, owner);
+        self.shareholders.write(caller, owner_shares);
+        self.is_shareholder_map.write(caller, true);
+
+        // Initialize shareholder array with owner
+        let mut shareholders_array = ArrayTrait::new();
+        shareholders_array.append(caller);
+        self.shareholder_addresses.write(shareholders_array);
         self.shareholder_count.write(1);
     }
 
-    #[abi(embed_v0)]
-    impl BigIncGenesisImpl of IBigIncGenesis<ContractState> {
-        fn mint_share(ref self: ContractState, token_address: ContractAddress) {
-            self.pausable.assert_not_paused();
-            self.reentrancy_guard.start();
+    // Modifiers implementation
+    // impl ModifierHelpers of ModifierHelpersTrait<ContractState> {
+    //     fn assert_only_owner(self: @ContractState) {
+    //         let caller = get_caller_address();
+    //         let owner = self.owner.read();
+    //         assert!(caller == owner, "Caller is not the owner");
+    //     }
 
-            self._validate_token(token_address);
+    //     fn assert_not_paused(self: @ContractState) {
+    //         let paused = self.paused.read();
+    //         assert!(!paused, "Contract is paused");
+    //     }
 
-            let caller = get_caller_address();
-            let contract_address = get_contract_address();
+    //     fn assert_valid_token(self: @ContractState, token_address: ContractAddress) {
+    //         let usdt = self.usdt_address.read();
+    //         let usdc = self.usdc_address.read();
+    //         assert!(token_address == usdt || token_address == usdc, "Invalid token address");
+    //     }
 
-            // Check if all shares are sold
-            if self.available_shares.read() == 0 {
-                self.emit(AllSharesSold {});
-                return;
-            }
+    //     fn assert_nonreentrant_before(ref self: ContractState) {
+    //         let entered = self.entered.read();
+    //         assert!(!entered, "ReentrancyGuard: reentrant call");
+    //         self.entered.write(true);
+    //     }
 
-            let token = IERC20Dispatcher { contract_address: token_address };
-            let amount = token.allowance(caller, contract_address);
-
-            assert(amount > 0, 'Amount must be > 0');
-            assert(token.balance_of(caller) >= amount, 'Insufficient token balance');
-
-            let current_price = if self.is_presale_active.read() {
-                self.presale_share_valuation.read()
-            } else {
-                self.total_share_valuation.read()
-            };
-
-            let shares_bought = (amount * 100000000_u256) / current_price;
-            let new_shares_sold = self.shares_sold.read() + shares_bought;
-
-            assert(shares_bought <= self.available_shares.read(), 'Exceeds available shares');
-
-            self.shares_sold.write(new_shares_sold);
-
-            if self.is_presale_active.read() && new_shares_sold >= self.presale_shares.read() {
-                self.is_presale_active.write(false);
-                self.emit(PresaleEnded {});
-            }
-
-            // Add to shareholder if new
-            if self.shareholders.read(caller) == 0 {
-                let current_count = self.shareholder_count.read();
-                self.shareholder_addresses.write(current_count, caller);
-                self.shareholder_count.write(current_count + 1);
-                self.is_shareholder_map.write(caller, true);
-            }
-
-            // Update balances
-            let current_shares = self.shareholders.read(caller);
-            self.shareholders.write(caller, current_shares + shares_bought);
-
-            let available = self.available_shares.read();
-            self.available_shares.write(available - shares_bought);
-
-            // Transfer tokens
-            token.transfer_from(caller, contract_address, amount);
-
-            self.emit(ShareMinted { buyer: caller, shares_bought, amount });
-
-            self.reentrancy_guard.end();
-        }
-
-        fn transfer_share(ref self: ContractState, to: ContractAddress, share_amount: u256) {
-            self.pausable.assert_not_paused();
-
-            let caller = get_caller_address();
-            assert(to != 0.try_into().unwrap(), 'Cannot transfer to zero address');
-
-            let sender_shares = self.shareholders.read(caller);
-            assert(sender_shares >= share_amount, 'Insufficient shares');
-
-            self.shareholders.write(caller, sender_shares - share_amount);
-
-            let recipient_shares = self.shareholders.read(to);
-            self.shareholders.write(to, recipient_shares + share_amount);
-
-            if recipient_shares == 0 {
-                let current_count = self.shareholder_count.read();
-                self.shareholder_addresses.write(current_count, to);
-                self.shareholder_count.write(current_count + 1);
-                self.is_shareholder_map.write(to, true);
-            }
-
-            if sender_shares == share_amount {
-                self.is_shareholder_map.write(caller, false);
-                self._remove_shareholder(caller);
-            }
-
-            self.emit(TransferShare { from: caller, to, share_amount });
-        }
-
-        fn donate(ref self: ContractState, token_address: ContractAddress, amount: u256) {
-            let caller = get_caller_address();
-            let contract_address = get_contract_address();
-
-            assert(amount > 0, 'Amount must be > 0');
-            assert(
-                token_address == self.usdt_address.read()
-                    || token_address == self.usdc_address.read(),
-                'USDC/USDT Only',
-            );
-            let token = IERC20Dispatcher { contract_address: token_address };
-
-            assert(token.balance_of(caller) >= amount, 'Insufficient balance');
-            assert(token.allowance(caller, contract_address) >= amount, 'Insufficient allowance');
-
-            token.transfer_from(caller, contract_address, amount);
-
-            self.emit(Donate { donor: caller, token_address, amount });
-        }
-
-        fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {
-            self.ownable.assert_only_owner();
-            self.reentrancy_guard.start();
-
-            let token = IERC20Dispatcher { contract_address: token_address };
-            let contract_address = get_contract_address();
-
-            assert(token.balance_of(contract_address) >= amount, 'Insufficient balance');
-
-            let owner = self.ownable.owner();
-            token.transfer(owner, amount);
-
-            self.reentrancy_guard.end();
-        }
-
-        fn seize_shares(ref self: ContractState, shareholder: ContractAddress) {
-            self.ownable.assert_only_owner();
-            self.pausable.assert_not_paused();
-
-            let shares_to_seize = self.shareholders.read(shareholder);
-            assert(shares_to_seize > 0, 'No shares to seize');
-
-            // Transfer shares to owner
-            let owner = self.ownable.owner();
-            let owner_shares = self.shareholders.read(owner);
-
-            self.shareholders.write(shareholder, 0);
-            self.shareholders.write(owner, owner_shares + shares_to_seize);
-
-            // Remove from shareholder list
-            self.is_shareholder_map.write(shareholder, false);
-            self._remove_shareholder(shareholder);
-
-            self.emit(SharesSeized { shareholder, share_amount: shares_to_seize });
-        }
-
-        fn pause(ref self: ContractState) {
-            self.ownable.assert_only_owner();
-            self.pausable.pause();
-        }
-
-        fn unpause(ref self: ContractState) {
-            self.ownable.assert_only_owner();
-            self.pausable.unpause();
-        }
-
-        // View functions
-        fn get_available_shares(self: @ContractState) -> u256 {
-            self.available_shares.read()
-        }
-
-        fn get_shares(self: @ContractState, addr: ContractAddress) -> u256 {
-            self.shareholders.read(addr)
-        }
-
-        fn get_shareholders(self: @ContractState) -> Array<ContractAddress> {
-            let mut shareholders = ArrayTrait::new();
-            let count = self.shareholder_count.read();
-            let mut i = 0;
-
-            while i < count {
-                let shareholder = self.shareholder_addresses.read(i);
-                if self.is_shareholder_map.read(shareholder) {
-                    shareholders.append(shareholder);
-                }
-                i += 1;
-            }
-
-            shareholders
-        }
-
-        fn is_shareholder(self: @ContractState, addr: ContractAddress) -> bool {
-            self.is_shareholder_map.read(addr)
-        }
-
-        fn get_usdt_address(self: @ContractState) -> ContractAddress {
-            self.usdt_address.read()
-        }
-
-        fn get_usdc_address(self: @ContractState) -> ContractAddress {
-            self.usdc_address.read()
-        }
-
-        fn get_total_share_valuation(self: @ContractState) -> u256 {
-            self.total_share_valuation.read()
-        }
-
-        fn get_presale_share_valuation(self: @ContractState) -> u256 {
-            self.presale_share_valuation.read()
-        }
-
-        fn get_presale_shares(self: @ContractState) -> u256 {
-            self.presale_shares.read()
-        }
-
-        fn get_shares_sold(self: @ContractState) -> u256 {
-            self.shares_sold.read()
-        }
-
-        fn is_presale_active(self: @ContractState) -> bool {
-            self.is_presale_active.read()
-        }
-
-        fn get_owner(self: @ContractState) -> ContractAddress {
-            self.ownable.owner()
-        }
-
-        fn transfer_owner(ref self: ContractState, new_owner: ContractAddress) {
-            self.ownable.transfer_ownership(new_owner);
-        }
-
-        /// Leaves the contract without an owner, prioritize `transfer_owner` for changes in the
-        /// access control
-        fn renounce_owner(ref self: ContractState) {
-            self.ownable.renounce_ownership();
-        }
-    }
-
-    #[generate_trait]
-    impl InternalImpl of InternalTrait {
-        fn _validate_token(self: @ContractState, token_address: ContractAddress) {
-            let usdt = self.usdt_address.read();
-            let usdc = self.usdc_address.read();
-            assert(token_address == usdt || token_address == usdc, 'Invalid token address');
-        }
-
-        fn _remove_shareholder(ref self: ContractState, shareholder: ContractAddress) {
-            let count = self.shareholder_count.read();
-            let mut i = 0;
-
-            while i < count {
-                if self.shareholder_addresses.read(i) == shareholder {
-                    // Move last element to this position
-                    let last_shareholder = self.shareholder_addresses.read(count - 1);
-                    self.shareholder_addresses.write(i, last_shareholder);
-                    self.shareholder_count.write(count - 1);
-                    break;
-                }
-                i += 1;
-            };
-        }
-    }
+    //     fn assert_nonreentrant_after(ref self: ContractState) {
+    //         self.entered.write(false);
+    //     }
+    // }
 }
+
