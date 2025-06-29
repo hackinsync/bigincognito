@@ -31,7 +31,7 @@ trait IBigIncGenesis<TContractState> {
 }
 
 #[starknet::contract]
-mod BigIncGenesis {
+pub mod BigIncGenesis {
     use super::IBigIncGenesis;
     use starknet::{
         ContractAddress, get_caller_address, get_contract_address,
@@ -46,31 +46,42 @@ mod BigIncGenesis {
         StoragePointerReadAccess,
     };
     use openzeppelin_access::ownable::OwnableComponent;
-
+    use openzeppelin_access::accesscontrol::AccessControlComponent;
     // use openzeppelin::access::ownable::OwnableComponent;
-    // use openzeppelin::security::pausable::PausableComponent;
-    // use openzeppelin::security::reentrancyguard::ReentrancyGuardComponent;
+    use openzeppelin_security::pausable::PausableComponent;
+    use openzeppelin_security::reentrancyguard::ReentrancyGuardComponent;
     // use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 
-
-    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
-    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
-    component!(path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent);
-
-    #[abi(embed_v0)]
-    impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
-    impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
-
-    #[abi(embed_v0)]
-    impl OwnableTwoStepMixinImpl = OwnableComponent::OwnableTwoStepMixinImpl<ContractState>;
-
-    #[abi(embed_v0)]
-    impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
-    impl PausableInternalImpl = PausableComponent::InternalImpl<ContractState>;
-
-    impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
-
-
+    #[storage]
+    struct Storage {
+        #[substorage(v0)]
+        ownable: OwnableComponent::Storage,
+        #[substorage(v0)]
+        pausable: PausableComponent::Storage,
+        #[substorage(v0)]
+        reentrancy_guard: ReentrancyGuardComponent::Storage,
+        // #[substorage(v0)]
+        // access_control: AccessControlComponent::Storage,
+        // Core contract state
+        owner: ContractAddress,
+        paused: bool,
+        //      Reentrancy guard
+        entered: bool,
+        // Core contract state
+        is_shareholder_map: Map<ContractAddress, bool>,
+        usdt_address: ContractAddress,
+        usdc_address: ContractAddress,
+        total_share_valuation: u256,
+        presale_share_valuation: u256,
+        presale_shares: u256,
+        shares_sold: u256,
+        available_shares: u256,
+        is_presale_active: bool,
+        // Shareholder data
+        shareholders: Map<ContractAddress, u256>,
+        shareholder_addresses: Map<u32, ContractAddress>,
+        shareholder_count: u32,
+    }
 
     // #[storage]
     // struct Storage {
@@ -94,104 +105,120 @@ mod BigIncGenesis {
     //     shareholder_count: u32,
     // }
 
-    #[storage]
-    struct Storage {
-        #[substorage(v0)]
-        ownable: OwnableComponent::Storage,
-        #[substorage(v0)]
-        pausable: PausableComponent::Storage,
-        #[substorage(v0)]
-        reentrancy_guard: ReentrancyGuardComponent::Storage,
-
-        // Core contract state
-        is_shareholder_map: LegacyMap<ContractAddress, bool>,
-        usdt_address: ContractAddress,
-        usdc_address: ContractAddress,
-        total_share_valuation: u256,
-        presale_share_valuation: u256,
-        presale_shares: u256,
-        shares_sold: u256,
-        available_shares: u256,
-        is_presale_active: bool,
-        
-        // Shareholder data
-        shareholders: LegacyMap<ContractAddress, u256>,
-        shareholder_addresses: LegacyMap<u32, ContractAddress>,
-        shareholder_count: u32,
-    }
-
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
+    pub enum Event {
         ShareMinted: ShareMinted,
         PresaleEnded: PresaleEnded,
         TransferShare: TransferShare,
         Donate: Donate,
         SharesSeized: SharesSeized,
         AllSharesSold: AllSharesSold,
-        OwnershipTransferred: OwnershipTransferred,
-        Paused: Paused,
-        Unpaused: Unpaused,
+        MainOwnershipTransferred: MainOwnershipTransferred,
+        MainPaused: MainPaused,
+        MainUnpaused: MainUnpaused,
+        SharesWithdrawn: SharesWithdrawn,  
+        #[flat]
+        OwnableEvent: OwnableComponent::Event,
+        #[flat]
+        PausableEvent: PausableComponent::Event,
+        #[flat]
+        ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
+        #[flat]
+        AccessControlEvent: AccessControlComponent::Event,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct ShareMinted {
+    pub struct ShareMinted {
         #[key]
-        buyer: ContractAddress,
-        shares_bought: u256,
-        amount: u256,
+        pub buyer: ContractAddress,
+        pub shares_bought: u256,
+        pub amount: u256,
     }
-
+ #[derive(Drop, starknet::Event)]
+    pub struct SharesWithdrawn {
+        pub token_address: ContractAddress,
+        pub amount:         u256,
+        pub owner:          ContractAddress,
+        pub timestamp:      u256,
+   }
+   
     #[derive(Drop, starknet::Event)]
-    struct PresaleEnded {}
-
-    #[derive(Drop, starknet::Event)]
-    struct TransferShare {
+    pub struct PresaleEnded {
         #[key]
-        from: ContractAddress,
+        pub presale_ended_by: ContractAddress,
+        pub total_shares_sold: u256,
+        pub total_amount_raised: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TransferShare {
         #[key]
-        to: ContractAddress,
-        share_amount: u256,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct Donate {
+        pub from: ContractAddress,
         #[key]
-        donor: ContractAddress,
-        amount: u256,
+        pub to: ContractAddress,
+        pub share_amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct SharesSeized {
+    pub struct Donate {
         #[key]
-        shareholder: ContractAddress,
-        share_amount: u256,
+        pub donor: ContractAddress,
+        pub amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct AllSharesSold {}
-
-    #[derive(Drop, starknet::Event)]
-    struct OwnershipTransferred {
+    pub struct SharesSeized {
         #[key]
-        previous_owner: ContractAddress,
+        pub shareholder: ContractAddress,
+        pub share_amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct AllSharesSold {}
+
+    #[derive(Drop, starknet::Event)]
+    pub struct MainOwnershipTransferred {
         #[key]
-        new_owner: ContractAddress,
+        pub previous_owner: ContractAddress,
+        #[key]
+        pub new_owner: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct Paused {
-        account: ContractAddress,
+    pub struct MainPaused {
+        pub account: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct Unpaused {
-        account: ContractAddress,
+    pub struct MainUnpaused {
+        pub account: ContractAddress,
     }
+
+
+    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
+    component!(
+        path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent,
+    );
+
+    #[abi(embed_v0)]
+    impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
+    impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
+
+    // #[abi(embed_v0)]
+    // impl OwnableTwoStepMixinImpl =
+    //     OwnableComponent::OwnableTwoStepMixinImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
+    impl PausableInternalImpl = PausableComponent::InternalImpl<ContractState>;
+
+    impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
 
 
     #[constructor]
-    fn constructor(
+    pub fn constructor(
         ref self: ContractState, usdt_address: ContractAddress, usdc_address: ContractAddress,
     ) {
         let caller = get_caller_address();
@@ -225,38 +252,37 @@ mod BigIncGenesis {
         // Initialize shareholder array with owner
         let mut shareholders_array = ArrayTrait::new();
         shareholders_array.append(caller);
-        self.shareholder_addresses.write(shareholders_array);
-        self.shareholder_count.write(1);
+        self.shareholder_addresses.write(0_u32, caller);
+        self.shareholder_count.write(1_u32);
     }
-
     // Modifiers implementation
-    // impl ModifierHelpers of ModifierHelpersTrait<ContractState> {
-    //     fn assert_only_owner(self: @ContractState) {
-    //         let caller = get_caller_address();
-    //         let owner = self.owner.read();
-    //         assert!(caller == owner, "Caller is not the owner");
-    //     }
+// impl ModifierHelpers of ModifierHelpersTrait<ContractState> {
+//     fn assert_only_owner(self: @ContractState) {
+//         let caller = get_caller_address();
+//         let owner = self.owner.read();
+//         assert!(caller == owner, "Caller is not the owner");
+//     }
 
     //     fn assert_not_paused(self: @ContractState) {
-    //         let paused = self.paused.read();
-    //         assert!(!paused, "Contract is paused");
-    //     }
+//         let paused = self.paused.read();
+//         assert!(!paused, "Contract is paused");
+//     }
 
     //     fn assert_valid_token(self: @ContractState, token_address: ContractAddress) {
-    //         let usdt = self.usdt_address.read();
-    //         let usdc = self.usdc_address.read();
-    //         assert!(token_address == usdt || token_address == usdc, "Invalid token address");
-    //     }
+//         let usdt = self.usdt_address.read();
+//         let usdc = self.usdc_address.read();
+//         assert!(token_address == usdt || token_address == usdc, "Invalid token address");
+//     }
 
     //     fn assert_nonreentrant_before(ref self: ContractState) {
-    //         let entered = self.entered.read();
-    //         assert!(!entered, "ReentrancyGuard: reentrant call");
-    //         self.entered.write(true);
-    //     }
+//         let entered = self.entered.read();
+//         assert!(!entered, "ReentrancyGuard: reentrant call");
+//         self.entered.write(true);
+//     }
 
     //     fn assert_nonreentrant_after(ref self: ContractState) {
-    //         self.entered.write(false);
-    //     }
-    // }
+//         self.entered.write(false);
+//     }
+// }
 }
 
