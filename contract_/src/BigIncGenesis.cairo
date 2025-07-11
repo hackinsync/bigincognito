@@ -36,6 +36,15 @@ pub trait IBigIncGenesis<TContractState> {
     fn get_owner(self: @TContractState) -> ContractAddress;
     fn transfer_owner(ref self: TContractState, new_owner: ContractAddress);
     fn renounce_owner(ref self: TContractState);
+
+    // Partner token functions
+    fn mint_partner_share(
+        ref self: TContractState, token_address: ContractAddress, token_amount: u256,
+    );
+    fn set_partner_token_rate(
+        ref self: TContractState, token_address: ContractAddress, tokens_per_share: u256,
+    );
+    fn get_partner_token_rate(self: @TContractState, token_address: ContractAddress) -> u256;
 }
 
 #[starknet::contract]
@@ -94,6 +103,8 @@ pub mod BigIncGenesis {
         is_shareholder_map: Map<ContractAddress, bool>,
         shareholder_addresses: Map<u32, ContractAddress>,
         shareholder_count: u32,
+        // Partner token rates (tokens required for 1 full share)
+        partner_token_rates: Map<ContractAddress, u256>,
     }
 
     #[event]
@@ -113,6 +124,7 @@ pub mod BigIncGenesis {
         AllSharesSold: AllSharesSold,
         Withdrawn: Withdrawn,
         PartnerShareCapSet: PartnerShareCapSet,
+        PartnerShareMinted: PartnerShareMinted,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -170,6 +182,16 @@ pub mod BigIncGenesis {
         cap: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct PartnerShareMinted {
+        #[key]
+        token_address: ContractAddress,
+        #[key]
+        buyer: ContractAddress,
+        amount_paid: u256,
+        shares_received: u256,
+        rate: u256,
+    }
 
     #[constructor]
     fn constructor(
@@ -395,7 +417,103 @@ pub mod BigIncGenesis {
             self.emit(PartnerShareCapSet { token_address, cap: 0 });
         }
 
+        fn mint_partner_share(
+            ref self: ContractState, token_address: ContractAddress, token_amount: u256,
+        ) {
+            self.pausable.assert_not_paused();
+            self.reentrancy_guard.start();
+
+            let caller = get_caller_address();
+            let contract_address = get_contract_address();
+
+            // check if all shares are sold
+            if self.available_shares.read() == 0 {
+                self.emit(AllSharesSold {});
+                return;
+            }
+
+            let tokens_per_share = self.partner_token_rates.read(token_address);
+            assert(tokens_per_share > 0, 'Partner token rate not set');
+
+            assert(token_amount > 0, 'Amount must be > 0');
+
+            let token = IERC20Dispatcher { contract_address: token_address };
+            assert(token.balance_of(caller) >= token_amount, 'Insufficient token balance');
+            assert(
+                token.allowance(caller, contract_address) >= token_amount, 'Insufficient allowance',
+            );
+
+            // calculate shares: (tokens_sent * share_precision) / tokens_per_share
+            let share_precision = 100000000_u256; // same precision as the `mint_share` function
+            let shares_received = (token_amount * share_precision) / tokens_per_share;
+
+            assert(shares_received > 0, 'Shares received must be > 0');
+            assert(shares_received <= self.available_shares.read(), 'Exceeds available shares');
+
+            let partner_cap = self.partner_share_cap.read(token_address);
+            if partner_cap > 0 {
+                let current_partner_shares = self.shares_minted_by_partner.read(token_address);
+                assert(
+                    current_partner_shares + shares_received <= partner_cap,
+                    'Exceeds partner share cap',
+                );
+                self
+                    .shares_minted_by_partner
+                    .write(token_address, current_partner_shares + shares_received);
+            }
+
+            let new_shares_sold = self.shares_sold.read() + shares_received;
+            self.shares_sold.write(new_shares_sold);
+
+            if self.is_presale_active.read() && new_shares_sold >= self.presale_shares.read() {
+                self.is_presale_active.write(false);
+                self.emit(PresaleEnded {});
+            }
+
+            // add to shareholder if new
+            if self.shareholders.read(caller) == 0 {
+                let current_count = self.shareholder_count.read();
+                self.shareholder_addresses.write(current_count, caller);
+                self.shareholder_count.write(current_count + 1);
+                self.is_shareholder_map.write(caller, true);
+            }
+
+            let current_shares = self.shareholders.read(caller);
+            self.shareholders.write(caller, current_shares + shares_received);
+
+            let available = self.available_shares.read();
+            self.available_shares.write(available - shares_received);
+
+            token.transfer_from(caller, contract_address, token_amount);
+
+            self
+                .emit(
+                    PartnerShareMinted {
+                        token_address,
+                        buyer: caller,
+                        amount_paid: token_amount,
+                        shares_received,
+                        rate: tokens_per_share,
+                    },
+                );
+
+            self.reentrancy_guard.end();
+        }
+
+        fn set_partner_token_rate(
+            ref self: ContractState, token_address: ContractAddress, tokens_per_share: u256,
+        ) {
+            self.ownable.assert_only_owner();
+            assert(tokens_per_share > 0, 'Rate must be > 0');
+
+            self.partner_token_rates.write(token_address, tokens_per_share);
+        }
+
         // View functions
+        fn get_partner_token_rate(self: @ContractState, token_address: ContractAddress) -> u256 {
+            self.partner_token_rates.read(token_address)
+        }
+
         fn get_available_shares(self: @ContractState) -> u256 {
             self.available_shares.read()
         }
@@ -499,6 +617,11 @@ pub mod BigIncGenesis {
                 }
                 i += 1;
             };
+        }
+
+        fn _validate_partner_token(self: @ContractState, token_address: ContractAddress) {
+            let rate = self.partner_token_rates.read(token_address);
+            assert(rate > 0, 'Partner token not configured');
         }
     }
 }
