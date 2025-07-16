@@ -558,6 +558,9 @@ pub trait IBigIncGenesis<TContractState> {
 #[starknet::contract]
 pub mod BigIncGenesis {
     use core::traits::Into;
+    use openzeppelin::access::ownable::OwnableComponent;
+    use openzeppelin::security::pausable::PausableComponent;
+    use openzeppelin::security::reentrancyguard::ReentrancyGuardComponent;
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
@@ -566,66 +569,73 @@ pub mod BigIncGenesis {
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
     use super::IBigIncGenesis;
 
-    
+    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
+    component!(
+        path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent,
+    );
 
-    // ============================================================================
-    // STORAGE STRUCTURE
-    // ============================================================================
+    #[abi(embed_v0)]
+    impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
+    impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
+    impl PausableInternalImpl = PausableComponent::InternalImpl<ContractState>;
+
+    impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
-        // ========== CONFIGURATION ==========
+        #[substorage(v0)]
+        ownable: OwnableComponent::Storage,
+        #[substorage(v0)]
+        pausable: PausableComponent::Storage,
+        #[substorage(v0)]
+        reentrancy_guard: ReentrancyGuardComponent::Storage,
+        // Token addresses
         usdt_address: ContractAddress,
         usdc_address: ContractAddress,
-        owner: ContractAddress,
-        paused: bool,
-
-        // ========== SHARE ECONOMICS ==========
+        // Share economics
         total_share_valuation: u256,
         presale_share_valuation: u256,
         presale_shares: u256,
         shares_sold: u256,
         available_shares: u256,
         is_presale_active: bool,
-
-        // ========== PARTNER MANAGEMENT ==========
+        // Partner token share caps
         partner_share_cap: Map<ContractAddress, u256>,
         shares_minted_by_partner: Map<ContractAddress, u256>,
-
-        // ========== SHAREHOLDER MANAGEMENT ==========
+        // Shareholder management
         shareholders: Map<ContractAddress, u256>,
+        is_shareholder_map: Map<ContractAddress, bool>,
         shareholder_addresses: Map<u32, ContractAddress>,
         shareholder_count: u32,
         shareholder_index: Map<ContractAddress, u32>,
     }
 
-    // ============================================================================
-    // EVENTS
-    // ============================================================================
-
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
+        #[flat]
+        OwnableEvent: OwnableComponent::Event,
+        #[flat]
+        PausableEvent: PausableComponent::Event,
+        #[flat]
+        ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
         // ========== SHARE EVENTS ==========
         ShareMinted: ShareMinted,
         TransferShare: TransferShare,
         SharesSeized: SharesSeized,
         AllSharesSold: AllSharesSold,
-
         // ========== PRESALE EVENTS ==========
         PresaleEnded: PresaleEnded,
-
         // ========== FINANCIAL EVENTS ==========
         Donate: Donate,
         Withdrawn: Withdrawn,
-
         // ========== PARTNER EVENTS ==========
         PartnerShareCapSet: PartnerShareCapSet,
-
         // ========== ADMINISTRATIVE EVENTS ==========
-        OwnershipTransferred: OwnershipTransferred,
-        Paused: Paused,
-        Unpaused: Unpaused,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -682,26 +692,6 @@ pub mod BigIncGenesis {
         cap: u256,
     }
 
-    #[derive(Drop, starknet::Event)]
-    struct OwnershipTransferred {
-        #[key]
-        previous_owner: ContractAddress,
-        #[key]
-        new_owner: ContractAddress,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct Paused {
-        #[key]
-        account: ContractAddress,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    struct Unpaused {
-        #[key]
-        account: ContractAddress,
-    }
-
     // ============================================================================
     // CONSTRUCTOR
     // ============================================================================
@@ -717,7 +707,10 @@ pub mod BigIncGenesis {
         self._validate_constructor_params(usdt_address, usdc_address, owner);
 
         // Initialize configuration
-        self.owner.write(owner);
+        self.ownable.initializer(owner);
+        // (No .initializer() for pausable or reentrancy_guard in Cairo 2.11.2)
+
+        // Set token addresses
         self.usdt_address.write(usdt_address);
         self.usdc_address.write(usdc_address);
 
@@ -737,7 +730,9 @@ pub mod BigIncGenesis {
         // ========== CORE FUNCTIONALITY ==========
 
         fn mint_share(ref self: ContractState, token_address: ContractAddress) {
-            self._assert_not_paused();
+            self.pausable.assert_not_paused();
+            self.reentrancy_guard.start();
+
             self._validate_token(token_address);
 
             let caller = get_caller_address();
@@ -746,6 +741,7 @@ pub mod BigIncGenesis {
             // Check if all shares are sold
             if self.available_shares.read() == 0 {
                 self.emit(AllSharesSold {});
+                self.reentrancy_guard.end();
                 return;
             }
 
@@ -778,10 +774,12 @@ pub mod BigIncGenesis {
             token.transfer_from(caller, contract_address, amount);
 
             self.emit(ShareMinted { buyer: caller, shares_bought, amount });
+
+            self.reentrancy_guard.end();
         }
 
         fn transfer_share(ref self: ContractState, to: ContractAddress, share_amount: u256) {
-            self._assert_not_paused();
+            self.pausable.assert_not_paused();
             self._validate_transfer_params(to, share_amount);
 
             let caller = get_caller_address();
@@ -828,12 +826,13 @@ pub mod BigIncGenesis {
         // ========== OWNER FUNCTIONS ==========
 
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {
-            self._assert_only_owner();
+            self.ownable.assert_only_owner();
+            self.reentrancy_guard.start();
             self._validate_withdrawal_params(amount, token_address);
 
             let token = IERC20Dispatcher { contract_address: token_address };
             let contract_address = get_contract_address();
-            let owner = self.owner.read();
+            let owner = self.ownable.owner();
 
             // Validate contract balance
             assert(token.balance_of(contract_address) >= amount, 'Insufficient balance');
@@ -843,17 +842,18 @@ pub mod BigIncGenesis {
 
             let timestamp: u256 = get_block_timestamp().into();
             self.emit(Withdrawn { token_address, amount, owner, timestamp });
+            self.reentrancy_guard.end();
         }
 
         fn seize_shares(ref self: ContractState, shareholder: ContractAddress) {
-            self._assert_only_owner();
-            self._assert_not_paused();
+            self.ownable.assert_only_owner();
+            self.pausable.assert_not_paused();
 
             let shares_to_seize = self.shareholders.read(shareholder);
             assert(shares_to_seize > 0, 'No shares to seize');
 
             // Transfer shares to owner
-            let owner = self.owner.read();
+            let owner = self.ownable.owner();
             let owner_shares = self.shareholders.read(owner);
 
             self.shareholders.write(shareholder, 0);
@@ -868,7 +868,7 @@ pub mod BigIncGenesis {
         fn set_partner_share_cap(
             ref self: ContractState, token_address: ContractAddress, cap: u256,
         ) {
-            self._assert_only_owner();
+            self.ownable.assert_only_owner();
             self._validate_token(token_address);
 
             self.partner_share_cap.write(token_address, cap);
@@ -876,7 +876,7 @@ pub mod BigIncGenesis {
         }
 
         fn remove_partner_share_cap(ref self: ContractState, token_address: ContractAddress) {
-            self._assert_only_owner();
+            self.ownable.assert_only_owner();
             self._validate_token(token_address);
 
             self.partner_share_cap.write(token_address, 0);
@@ -884,17 +884,13 @@ pub mod BigIncGenesis {
         }
 
         fn pause(ref self: ContractState) {
-            self._assert_only_owner();
-            self.paused.write(true);
-            let caller = get_caller_address();
-            self.emit(Paused { account: caller });
+            self.ownable.assert_only_owner();
+            self.pausable.pause();
         }
 
         fn unpause(ref self: ContractState) {
-            self._assert_only_owner();
-            self.paused.write(false);
-            let caller = get_caller_address();
-            self.emit(Unpaused { account: caller });
+            self.ownable.assert_only_owner();
+            self.pausable.unpause();
         }
 
         // ========== VIEW FUNCTIONS ==========
@@ -960,26 +956,15 @@ pub mod BigIncGenesis {
         }
 
         fn get_owner(self: @ContractState) -> ContractAddress {
-            self.owner.read()
+            self.ownable.owner()
         }
 
         fn transfer_owner(ref self: ContractState, new_owner: ContractAddress) {
-            self._assert_only_owner();
-            self._validate_new_owner(new_owner);
-
-            let previous_owner = self.owner.read();
-            self.owner.write(new_owner);
-
-            self.emit(OwnershipTransferred { previous_owner, new_owner });
+            self.ownable.transfer_ownership(new_owner);
         }
 
         fn renounce_owner(ref self: ContractState) {
-            self._assert_only_owner();
-            let previous_owner = self.owner.read();
-            let zero_address: ContractAddress = 0.try_into().unwrap();
-            self.owner.write(zero_address);
-
-            self.emit(OwnershipTransferred { previous_owner, new_owner: zero_address });
+            self.ownable.renounce_ownership();
         }
     }
 
@@ -1089,12 +1074,12 @@ pub mod BigIncGenesis {
 
         fn _assert_only_owner(self: @ContractState) {
             let caller = get_caller_address();
-            let owner = self.owner.read();
+            let owner = self.ownable.owner();
             assert(caller == owner, 'Caller is not the owner');
         }
 
         fn _assert_not_paused(self: @ContractState) {
-            assert(!self.paused.read(), 'Contract is paused');
+            self.pausable.assert_not_paused();
         }
 
         // ========== SHARE CALCULATION HELPERS ==========
