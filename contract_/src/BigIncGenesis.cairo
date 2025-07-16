@@ -23,14 +23,16 @@
 //     // Owner functions
 //     fn withdraw(ref self: TContractState, token_address: ContractAddress, amount: u256);
 //     fn seize_shares(ref self: TContractState, shareholder: ContractAddress);
-//     fn set_partner_share_cap(ref self: TContractState, token_address: ContractAddress, cap: u256);
+//     fn set_partner_share_cap(ref self: TContractState, token_address: ContractAddress, cap:
+//     u256);
 //     fn remove_partner_share_cap(ref self: TContractState, token_address: ContractAddress);
 //     fn pause(ref self: TContractState);
 //     fn unpause(ref self: TContractState);
 
 //     // Partner view functions
 //     fn get_partner_share_cap(self: @TContractState, token_address: ContractAddress) -> u256;
-//     fn get_shares_minted_by_partner(self: @TContractState, token_address: ContractAddress) -> u256;
+//     fn get_shares_minted_by_partner(self: @TContractState, token_address: ContractAddress) ->
+//     u256;
 
 //     // Ownable functions
 //     fn get_owner(self: @TContractState) -> ContractAddress;
@@ -49,7 +51,8 @@
 //         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
 //         StoragePointerWriteAccess,
 //     };
-//     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+//     use starknet::{ContractAddress, get_block_timestamp, get_caller_address,
+//     get_contract_address};
 //     use super::IBigIncGenesis;
 
 //     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -153,7 +156,6 @@
 //     #[derive(Drop, starknet::Event)]
 //     struct AllSharesSold {}
 
-
 //     #[derive(Drop, starknet::Event)]
 //     struct Withdrawn {
 //         #[key]
@@ -169,7 +171,6 @@
 //         token_address: ContractAddress,
 //         cap: u256,
 //     }
-
 
 //     #[constructor]
 //     fn constructor(
@@ -320,7 +321,8 @@
 //             let token = IERC20Dispatcher { contract_address: token_address };
 
 //             assert(token.balance_of(caller) >= amount, 'Insufficient balance');
-//             assert(token.allowance(caller, contract_address) >= amount, 'Insufficient allowance');
+//             assert(token.allowance(caller, contract_address) >= amount, 'Insufficient
+//             allowance');
 
 //             token.transfer_from(caller, contract_address, amount);
 
@@ -341,7 +343,8 @@
 
 //             //     Emit Withdrawn event
 //             let ts: u256 = get_block_timestamp().into();
-//             self.emit(Event::Withdrawn(Withdrawn { token_address, amount, owner, timestamp: ts }));
+//             self.emit(Event::Withdrawn(Withdrawn { token_address, amount, owner, timestamp: ts
+//             }));
 
 //             self.reentrancy_guard.end();
 //         }
@@ -502,9 +505,6 @@
 //         }
 //     }
 // }
-
-
-
 
 use starknet::ContractAddress;
 
@@ -1015,10 +1015,7 @@ pub mod BigIncGenesis {
         }
 
         fn _validate_mint_amount(
-            self: @ContractState,
-            amount: u256,
-            caller: ContractAddress,
-            token: IERC20Dispatcher,
+            self: @ContractState, amount: u256, caller: ContractAddress, token: IERC20Dispatcher,
         ) {
             assert(amount > 0, 'Amount must be > 0');
             assert(token.balance_of(caller) >= amount, 'Insufficient token balance');
@@ -1030,9 +1027,7 @@ pub mod BigIncGenesis {
         }
 
         fn _validate_transfer_params(
-            self: @ContractState,
-            to: ContractAddress,
-            share_amount: u256,
+            self: @ContractState, to: ContractAddress, share_amount: u256,
         ) {
             let zero_address: ContractAddress = 0.try_into().unwrap();
             assert(to != zero_address, 'Cannot transfer to zero address');
@@ -1040,26 +1035,20 @@ pub mod BigIncGenesis {
         }
 
         fn _validate_sufficient_shares(
-            self: @ContractState,
-            sender_shares: u256,
-            share_amount: u256,
+            self: @ContractState, sender_shares: u256, share_amount: u256,
         ) {
             assert(sender_shares >= share_amount, 'Insufficient shares');
         }
 
         fn _validate_donation_params(
-            self: @ContractState,
-            amount: u256,
-            token_address: ContractAddress,
+            self: @ContractState, amount: u256, token_address: ContractAddress,
         ) {
             assert(amount > 0, 'Amount must be > 0');
             self._validate_token(token_address);
         }
 
         fn _validate_withdrawal_params(
-            self: @ContractState,
-            amount: u256,
-            token_address: ContractAddress,
+            self: @ContractState, amount: u256, token_address: ContractAddress,
         ) {
             assert(amount > 0, 'Amount must be > 0');
             self._validate_token(token_address);
@@ -1100,9 +1089,7 @@ pub mod BigIncGenesis {
         // ========== PARTNER SHARE CAP HELPERS ==========
 
         fn _check_partner_share_cap(
-            ref self: ContractState,
-            token_address: ContractAddress,
-            shares_bought: u256,
+            ref self: ContractState, token_address: ContractAddress, shares_bought: u256,
         ) {
             let partner_cap = self.partner_share_cap.read(token_address);
             if partner_cap > 0 {
@@ -1151,9 +1138,7 @@ pub mod BigIncGenesis {
         }
 
         fn _update_shareholder_balance(
-            ref self: ContractState,
-            shareholder: ContractAddress,
-            shares_bought: u256,
+            ref self: ContractState, shareholder: ContractAddress, shares_bought: u256,
         ) {
             let current_shares = self.shareholders.read(shareholder);
             self.shareholders.write(shareholder, current_shares + shares_bought);
