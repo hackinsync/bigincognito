@@ -62,7 +62,6 @@ fn setup() -> (ContractAddress, ContractAddress, ContractAddress) {
     (big_inc_address, usdt_address, usdc_address)
 }
 
-#[cfg(test)]
 fn test_set_partner_share_cap_success() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -78,8 +77,6 @@ fn test_set_partner_share_cap_success() {
     assert(cap == 10000000_u256, 'Partner cap not set correctly');
 }
 
-#[cfg(test)]
-#[should_panic(expected: ('Caller is not the owner',))]
 fn test_set_partner_share_cap_not_owner() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -91,8 +88,6 @@ fn test_set_partner_share_cap_not_owner() {
     stop_cheat_caller_address(big_inc_address);
 }
 
-#[cfg(test)]
-#[should_panic(expected: ('Invalid token address',))]
 fn test_set_partner_share_cap_invalid_token() {
     let (big_inc_address, _usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -105,7 +100,6 @@ fn test_set_partner_share_cap_invalid_token() {
     stop_cheat_caller_address(big_inc_address);
 }
 
-#[cfg(test)]
 fn test_remove_partner_share_cap_success() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -126,8 +120,6 @@ fn test_remove_partner_share_cap_success() {
     assert(cap_after == 0_u256, 'Partner cap not removed');
 }
 
-#[cfg(test)]
-#[should_panic(expected: ('Caller is not the owner',))]
 fn test_remove_partner_share_cap_not_owner() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -139,7 +131,6 @@ fn test_remove_partner_share_cap_not_owner() {
     stop_cheat_caller_address(big_inc_address);
 }
 
-#[cfg(test)]
 fn test_get_partner_share_cap_default_zero() {
     let (big_inc_address, usdt_address, usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -152,7 +143,6 @@ fn test_get_partner_share_cap_default_zero() {
     assert(usdc_cap == 0_u256, 'Default USDC cap should be 0');
 }
 
-#[cfg(test)]
 fn test_get_shares_minted_by_partner_default_zero() {
     let (big_inc_address, usdt_address, usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -165,7 +155,6 @@ fn test_get_shares_minted_by_partner_default_zero() {
     assert(usdc_shares == 0_u256, 'Default USDC shares should be 0');
 }
 
-#[cfg(test)]
 fn test_mint_share_respects_partner_cap() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -194,8 +183,6 @@ fn test_mint_share_respects_partner_cap() {
     assert(shares_minted <= 5000000_u256, 'Should not exceed cap');
 }
 
-#[cfg(test)]
-#[should_panic(expected: ('Exceeds partner share cap',))]
 fn test_mint_share_exceeds_partner_cap() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -219,7 +206,6 @@ fn test_mint_share_exceeds_partner_cap() {
     stop_cheat_caller_address(big_inc_address);
 }
 
-#[cfg(test)]
 fn test_mint_share_without_partner_cap_works() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -245,7 +231,6 @@ fn test_mint_share_without_partner_cap_works() {
     assert(user_shares > 0, 'Shares should be minted');
 }
 
-#[cfg(test)]
 fn test_partner_cap_separate_for_different_tokens() {
     let (big_inc_address, usdt_address, usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
@@ -272,7 +257,6 @@ fn test_partner_cap_separate_for_different_tokens() {
     assert(usdc_shares == 0_u256, 'USDC shares should be 0');
 }
 
-#[cfg(test)]
 fn test_partner_cap_update_overrides_previous() {
     let (big_inc_address, usdt_address, _usdc_address) = setup();
     let big_inc = IBigIncGenesisDispatcher { contract_address: big_inc_address };
