@@ -17,6 +17,8 @@ import { formatUnits, parseUnits } from "viem";
 import { Button } from '@components/ui/button';
 import { toast } from '@components/ui/use-toast';
 import { useAppKit } from '@reown/appkit/react'
+import { WalletProvider } from '@context/WalletContext';
+import ConnectButton from '@components/ConnectButton';
 
 const config = createConfig({
   chains: [polygon],
@@ -99,21 +101,21 @@ export default function Page() {
       }
     } catch (error: any) {
       console.log(error.message);
-      if (error.message.includes("Connector not connected.")){
+      if (error.message.includes("Connector not connected.")) {
         toast({
           variant: "destructive",
           title: "Connect your wallet",
           description: "Your wallet isn't connected",
         });
         open();
-      } else if (error.message.includes("connection.connector.getChainId")){
+      } else if (error.message.includes("connection.connector.getChainId")) {
         await disconnect();
         open();
-      } else if (error.message.includes("User rejected the request.")){
+      } else if (error.message.includes("User rejected the request.")) {
         toast({
           title: "Looks like might be testing 🤓",
         });
-      }else{
+      } else {
         toast({
           variant: "destructive",
           title: "Something went wrong",
@@ -462,7 +464,7 @@ export default function Page() {
             </p>
             <CardContent className="flex flex-col items-center gap-4">
               <ShareChart yourShare={yourShare} soldShare={soldShare} availableShare={availableShare} />
-              <ShareModal crypto={crypto} totalShare={totalShare} yourShare={yourShare} onCryptoChange={setCrypto} />
+              <ConnectButton />
             </CardContent>
           </Card>
         </section>

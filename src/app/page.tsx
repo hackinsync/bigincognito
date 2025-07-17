@@ -7,8 +7,7 @@ import { Button } from "@components/ui/button";
 import { InstagramLogoIcon } from "@radix-ui/react-icons";
 import emoji from "react-easy-emoji";
 import { SocialIcon } from "react-social-icons";
-import BackedUp from '@components/BackedUp';
-
+import BackedUp from "@components/BackedUp";
 
 export default function Page() {
   return (
@@ -42,9 +41,7 @@ export default function Page() {
                 <PlayVideo />
               </a>
             </div>
-            <h3 className="text-xl font-lighten my-5">
-              DO BETTER (COVER)
-            </h3>
+            <h3 className="text-xl font-lighten my-5">DO BETTER (COVER)</h3>
             <div>
               <a
                 href="https://www.instagram.com/reel/C2EsFbtKWTR/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA=="
@@ -167,7 +164,15 @@ export default function Page() {
             EBRUVWIYO ABEKE
           </h2>
           <p className="max-w-[1000px] w-fit mx-auto font-thin poppins-light text-center py-2">
-            The poetry of Big Inc is an ever burning love affair between magic and the mundaneness of everyday life, weaving an ever shifting tapestry of sound from the fabric of his imagination, his artistry tilts towards rapping with intricate rhyme schemes yet he treats music as a boundless form of expression with influences within and beyond the circumference of hip-hop like Jay Electronica, Black Thought, Bon Iver, Twenty One Pilots, Linkin Park, Empire Of The Sun, Shabaka, Isik Kural, Armand Hammer. He carves his unique style and trailblaze in his artistic trajectory.
+            The poetry of Big Inc is an ever burning love affair between magic
+            and the mundaneness of everyday life, weaving an ever shifting
+            tapestry of sound from the fabric of his imagination, his artistry
+            tilts towards rapping with intricate rhyme schemes yet he treats
+            music as a boundless form of expression with influences within and
+            beyond the circumference of hip-hop like Jay Electronica, Black
+            Thought, Bon Iver, Twenty One Pilots, Linkin Park, Empire Of The
+            Sun, Shabaka, Isik Kural, Armand Hammer. He carves his unique style
+            and trailblaze in his artistic trajectory.
           </p>
         </div>
       </section>
@@ -194,10 +199,12 @@ export default function Page() {
         </div>
         <div className="max-sm:flex-col flex py-1 max-sm:items-center max-sm:gap-5 text-gray-400 text-sm justify-between w-full">
           <span className="uppercase">
-            <span className="relative top-[-1px]">©</span> {new Date().getFullYear()} Big Inc.
+            <span className="relative top-[-1px]">©</span>{" "}
+            {new Date().getFullYear()} Big Inc.
           </span>
           <span className="w-fit uppercase text-gray-400 gap-1 flex items-center  break-keep">
-            Made With <span className="relative top-[-1.5px]">{emoji("❤")}</span>{" "}
+            Made With{" "}
+            <span className="relative top-[-1.5px]">{emoji("❤")}</span>{" "}
             <a
               className="text-ourWhite"
               href="https://www.jedshock.com"
@@ -208,6 +215,6 @@ export default function Page() {
           </span>
         </div>
       </footer>
-    </main>
+    </main> 
   );
 }

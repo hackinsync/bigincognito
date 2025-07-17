@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-page-custom-font */
+import { StarknetAppProvider } from "@context/StarknetKitProvider";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -21,7 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <>
-      {children}
+      <StarknetAppProvider>
+        {children}
+      </StarknetAppProvider>
     </>
   );
 }
