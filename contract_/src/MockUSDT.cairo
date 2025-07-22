@@ -41,14 +41,14 @@ pub mod MockUSDT {
             ref self: ERC20Component::ComponentState<ContractState>,
             from: ContractAddress,
             recipient: ContractAddress,
-            amount: u256
+            amount: u256,
         ) {}
 
         fn after_update(
             ref self: ERC20Component::ComponentState<ContractState>,
             from: ContractAddress,
             recipient: ContractAddress,
-            amount: u256
+            amount: u256,
         ) {}
     }
 
@@ -66,11 +66,7 @@ pub mod MockUSDT {
     }
 
     #[constructor]
-    fn constructor(
-        ref self: ContractState,
-        initial_supply: u256,
-        recipient: ContractAddress,
-    ) {
+    fn constructor(ref self: ContractState, initial_supply: u256, recipient: ContractAddress) {
         // Hardcoded USDT values
         let name: ByteArray = "Mock Tether USD";
         let symbol: ByteArray = "USDT";
