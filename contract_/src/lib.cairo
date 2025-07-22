@@ -1,2 +1,2 @@
-mod BigIncGenesis;
+pub mod BigIncGenesis;
 mod MockERC20;
