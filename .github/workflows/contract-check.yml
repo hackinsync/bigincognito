@@ -12,6 +12,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  check-fmt:
+    runs-on: ubuntu-latest
+    name: Cairo formatting
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          tool-versions: contract_/.tool-versions
+      - name: Check Scarb Formatting
+        run: scarb fmt --check
   build-and-test:
     runs-on: ubuntu-latest
 

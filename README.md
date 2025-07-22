@@ -1,4 +1,6 @@
-# Big Inc (Big Incognito): An artist on onchain: [IG](https://www.instagram.com/big_inc_?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==) 
+# Big Inc (Big Incognito): An artist on onchain: [Social Proof](https://www.instagram.com/big_inc_?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==) 
+
+Join our Community: [Telegram](https://t.me/MusicStrk_CJ)
 
 ## A product of [MusicStrk](https://github.com/hackinsync/musicstrk), or the vision of [MusicStrk](https://github.com/hackinsync/musicstrk).
 
