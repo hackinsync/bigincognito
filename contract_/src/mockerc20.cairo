@@ -48,8 +48,8 @@ pub mod MockToken {
 
     #[constructor]
     fn constructor(ref self: ContractState, owner: ContractAddress) {
-        self.token_name.write("COITON");
-        self.symbol.write("CTN");
+        self.token_name.write("BIGINC");
+        self.symbol.write("BIGINC");
         self.decimal.write(18);
         self.owner.write(owner);
     }

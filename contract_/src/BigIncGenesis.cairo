@@ -646,7 +646,6 @@ pub mod BigIncGenesis {
         Withdrawn: Withdrawn,
         // ========== PARTNER EVENTS ==========
         PartnerShareCapSet: PartnerShareCapSet,
-
         // ========== ADMINISTRATIVE EVENTS ==========
 
         PartnerShareMinted: PartnerShareMinted,
