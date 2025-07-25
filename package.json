@@ -4,9 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:starknet": "NEXT_PUBLIC_USE_STARKNET=true next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "setup:devnet": "./scripts/setup-devnet.sh",
+    "stop:devnet": "./scripts/stop-devnet.sh",
+    "deploy:contracts": "./scripts/deploy-contracts.sh",
+    "setup:full": "./scripts/full-setup.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
@@ -33,7 +38,7 @@
     "react-responsive": "^10.0.0",
     "react-social-icons": "^6.18.0",
     "recharts": "^2.13.0",
-    "starknet": "^7.6.2",
+    "starknet": "^6.24.1",
     "starknetkit": "^2.12.1",
     "tailwind-merge": "^2.3.0",
     "tailwind-scrollbar": "^3.1.0",

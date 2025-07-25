@@ -1,0 +1,423 @@
+[
+    {
+        "type": "impl",
+        "name": "BigIncGenesisImpl",
+        "interface_name": "contract_::BigIncGenesis::IBigIncGenesis"
+    },
+    {
+        "type": "interface",
+        "name": "contract_::BigIncGenesis::IBigIncGenesis",
+        "items": [
+            {
+                "type": "function",
+                "name": "mint_share",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "transfer_share",
+                "inputs": [
+                    {
+                        "name": "to",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "share_amount",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "donate",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "get_available_shares",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_shares",
+                "inputs": [
+                    {
+                        "name": "addr",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_shareholders",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::array::Array::<core::starknet::contract_address::ContractAddress>"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "is_shareholder",
+                "inputs": [
+                    {
+                        "name": "addr",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "core::bool"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_usdt_address",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_usdc_address",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_total_share_valuation",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_presale_share_valuation",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_presale_shares",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_shares_sold",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "is_presale_active",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::bool"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "withdraw",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "seize_shares",
+                "inputs": [
+                    {
+                        "name": "shareholder",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "set_partner_share_cap",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "cap",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "remove_partner_share_cap",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "pause",
+                "inputs": [],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "unpause",
+                "inputs": [],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "get_partner_share_cap",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_shares_minted_by_partner",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "get_owner",
+                "inputs": [],
+                "outputs": [
+                    {
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "state_mutability": "view"
+            },
+            {
+                "type": "function",
+                "name": "transfer_owner",
+                "inputs": [
+                    {
+                        "name": "new_owner",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "renounce_owner",
+                "inputs": [],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "mint_partner_share",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "token_amount",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "set_partner_token_rate",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    },
+                    {
+                        "name": "tokens_per_share",
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "outputs": [],
+                "state_mutability": "external"
+            },
+            {
+                "type": "function",
+                "name": "get_partner_token_rate",
+                "inputs": [
+                    {
+                        "name": "token_address",
+                        "type": "core::starknet::contract_address::ContractAddress"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "type": "core::integer::u256"
+                    }
+                ],
+                "state_mutability": "view"
+            }
+        ]
+    },
+    {
+        "type": "constructor",
+        "name": "constructor",
+        "inputs": [
+            {
+                "name": "usdt_address",
+                "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+                "name": "usdc_address",
+                "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress"
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "contract_::BigIncGenesis::BigIncGenesis::Event",
+        "kind": "enum",
+        "variants": [
+            {
+                "name": "ShareMinted",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::ShareMinted",
+                "kind": "struct"
+            },
+            {
+                "name": "PresaleEnded",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::PresaleEnded",
+                "kind": "struct"
+            },
+            {
+                "name": "TransferShare",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::TransferShare",
+                "kind": "struct"
+            },
+            {
+                "name": "Donate",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::Donate",
+                "kind": "struct"
+            },
+            {
+                "name": "SharesSeized",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::SharesSeized",
+                "kind": "struct"
+            },
+            {
+                "name": "AllSharesSold",
+                "type": "contract_::BigIncGenesis::BigIncGenesis::AllSharesSold",
+                "kind": "struct"
+            }
+        ]
+    }
+]

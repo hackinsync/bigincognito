@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactNode, useMemo } from 'react'
 import { InjectedConnector } from "@starknet-react/core"
 import { WalletProvider } from "./WalletContext"
+import { katanaLocal } from "../lib/starknet/config"
 
 const queryClient = new QueryClient();
 
@@ -20,7 +21,12 @@ export function StarknetAppProvider({ children }: { children: ReactNode }) {
     );
 
     return (
-        <StarknetConfig chains={[mainnet, sepolia]} provider={publicProvider()} connectors={connectors} explorer={voyager}>
+        <StarknetConfig
+            chains={[katanaLocal, sepolia, mainnet]}
+            provider={publicProvider()}
+            connectors={connectors}
+            explorer={voyager}
+        >
             <QueryClientProvider client={queryClient}>
                 <WalletProvider connectors={connectors}>
                     {children}

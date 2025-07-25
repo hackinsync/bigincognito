@@ -1,0 +1,34 @@
+{
+  "network": "katana_local",
+  "rpc_url": "http://localhost:5050",
+  "contracts": {
+    "BigIncGenesis": {
+      "address": "0x0524d0778e535c840b4aeea9958d30c182d0064cdd584ea7c0f9e0cf897b36bc",
+      "class_hash": "0x06b69532ce0df2f3d6361775ebc5ce59d01f399c69b2ce802c2c0755a1c84a2b"
+    },
+    "MockUSDT": {
+      "address": "0x04d2092d368213a814e384facca6a82a47f753f9c95bd98859374f47bbfb9398",
+      "class_hash": "0x0365f4f0dd738f5d5a51760aa002ed66f690c0337af0b41c664ae10b0fb78dd0",
+      "symbol": "MOCK",
+      "name": "Mock Token",
+      "decimals": 18
+    },
+    "MockUSDC": {
+      "address": "0x06e37c9a6de30781abc6973101e7a7c5e343ccb906a70223a24407a56cde99ef",
+      "class_hash": "0x0365f4f0dd738f5d5a51760aa002ed66f690c0337af0b41c664ae10b0fb78dd0",
+      "symbol": "MOCK",
+      "name": "Mock Token",
+      "decimals": 18
+    }
+  },
+  "test_accounts": [
+    {
+      "address": "0xf082b9d66cd3d9e4edc4d9c9450e7b154e88d490a22b214ee41c9d291df876",
+      "private_key": "0x53b7668914511a29edc1247c0d2a9a44d0c9c78b4a2d8163c6439a4bde52a98"
+    },
+    {
+      "address": "0x175c0552eda5d4b38250a5388d4d11b1a018df0c3081c7fe2ee3478ada43d78",
+      "private_key": "0x7dd2923d111acc143d8e1f1b95850bce0479e19bdd4dc4c83a33da7efeb0fd7"
+    }
+  ]
+}

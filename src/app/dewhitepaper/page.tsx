@@ -3,10 +3,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @next/next/no-img-element */
-import { readContracts, http, createConfig, writeContract } from '@wagmi/core'
-import { polygon } from 'wagmi/chains'
 import { ShareChart } from "@components/ShareChart";
 import { ShareModal } from "@components/ShareModal";
+import { ShareChartStarknet } from "@components/ShareChartStarknet";
+import { ShareModalStarknet } from "@components/ShareModalStarknet";
 import { Card, CardHeader, CardTitle, CardContent } from "@components/ui/card";
 import { useAppKitAccount, useDisconnect } from "@reown/appkit/react";
 import { useEffect, useState } from "react";
@@ -19,25 +19,43 @@ import { toast } from '@components/ui/use-toast';
 import { useAppKit } from '@reown/appkit/react'
 import { WalletProvider } from '@context/WalletContext';
 import ConnectButton from '@components/ConnectButton';
+import { useShareData } from '@/lib/starknet/hooks';
+import { useAccount } from '@starknet-react/core';
+import { contractAddresses } from '@/lib/starknet/config';
 
-const config = createConfig({
-  chains: [polygon],
-  transports: {
-    [polygon.id]: http()
-  }
-});
-
+// Toggle between WAGMI (Ethereum) and Starknet implementation
+const USE_STARKNET = process.env.NEXT_PUBLIC_USE_STARKNET === 'true' || contractAddresses.BigIncGenesis !== '0x0';
 
 export default function Page() {
+  // Starknet implementation
+  const starknetAccount = useAccount()
+  const starknetShareData = useShareData()
+
+  // Ethereum implementation (existing)
   const { open, close } = useAppKit()
   const { disconnect } = useDisconnect()
-  const totalShare = 100
   const { address, isConnected } = useAppKitAccount();
+
   const [yourShare, setYourShare] = useState(0)
   const [availableShare, setAvailableShare] = useState(0)
   const [soldShare, setSoldShare] = useState(0)
   const [teamShare, setTeamShare] = useState(0)
   const [crypto, setCrypto] = useState("usdt")
+
+  // Use Starknet data if available and Starknet is enabled
+  const finalShareData = USE_STARKNET ? {
+    yourShare: starknetShareData.userShare,
+    availableShare: starknetShareData.availableShare,
+    soldShare: starknetShareData.soldShare,
+    teamShare: starknetShareData.teamShare
+  } : {
+    yourShare,
+    availableShare,
+    soldShare,
+    teamShare
+  }
+
+  // Legacy WAGMI contract calls (only used when Starknet is not available)
   const getShares = {
     abi,
     address: contractAddress as `0x${string}`,
@@ -67,82 +85,21 @@ export default function Page() {
     contracts: [getShares, availableShares, soldShares, teamShares],
   });
 
-  const fallbackOnchainFetch = async () => {
-    try {
-      const data = await readContracts(config, {
-        // @ts-ignore
-        contracts: [availableShares, soldShares, teamShares]
-      });
-      setAvailableShare(Number(formatUnits(data?.[0]?.result as bigint, 6)));
-      setSoldShare(Number(formatUnits(data?.[1]?.result as bigint, 6)));
-      setTeamShare(Number(formatUnits(data?.[2]?.result as bigint, 6)));
-    } catch (error) {
-      console.log(error, "Fallback error");
-    }
-  }
-
-  async function donate() {
-    let amount: string | null = prompt("How much POL would you like to donate? \n(number)");
-    console.log(amount);
-    try {
-      if (amount !== null && Number(amount) > 0) {
-        let bigIntAmount = parseUnits(amount, 18);
-        let hash = await writeContract(config, {
-          abi,
-          address: contractAddress,
-          functionName: "donate",
-          value: bigIntAmount
-        });
-        toast({
-          title: "Thank you for donating!",
-          description: "This is truly invaluable to us 💜",
-        });
-        console.log(hash, "TX Hash");
-      }
-    } catch (error: any) {
-      console.log(error.message);
-      if (error.message.includes("Connector not connected.")) {
-        toast({
-          variant: "destructive",
-          title: "Connect your wallet",
-          description: "Your wallet isn't connected",
-        });
-        open();
-      } else if (error.message.includes("connection.connector.getChainId")) {
-        await disconnect();
-        open();
-      } else if (error.message.includes("User rejected the request.")) {
-        toast({
-          title: "Looks like might be testing 🤓",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Something went wrong",
-          description: "Hope the figure you inputted is a number?",
-        });
-      }
-    }
-  }
-
+  // Only use legacy functions when Starknet is not available
   useEffect(() => {
-    fallbackOnchainFetch();
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (isConnected) {
-        setYourShare(Number(formatUnits(data?.[0]?.result as bigint, 6)));
-        setAvailableShare(Number(formatUnits(data?.[1]?.result as bigint, 6)));
-        setSoldShare(Number(formatUnits(data?.[2]?.result as bigint, 6)));
-        setTeamShare(Number(formatUnits(data?.[3]?.result as bigint, 6)));
-      } else {
-        fallbackOnchainFetch();
+    if (!USE_STARKNET) {
+      try {
+        if (isConnected && isSuccess && data) {
+          setYourShare(Number(formatUnits(data?.[0]?.result as bigint, 6)));
+          setAvailableShare(Number(formatUnits(data?.[1]?.result as bigint, 6)));
+          setSoldShare(Number(formatUnits(data?.[2]?.result as bigint, 6)));
+          setTeamShare(Number(formatUnits(data?.[3]?.result as bigint, 6)));
+        }
+      } catch (error) {
+        console.log(error)
       }
-    } catch (error) {
-      console.log(error)
     }
-  }, [isConnected, isSuccess]);
+  }, [isConnected, isSuccess, data]);
   return (
     <>
       <main className="w-full h-full max-w-screen-2xl mx-auto">
@@ -263,22 +220,22 @@ export default function Page() {
                   </strong>{" "}
                   Every stream the artist earns from the album will flow back to
                   the revenue pool <strong className="poppins-extrabold">
-                    <span>{availableShare}%</span>
+                    <span>{finalShareData.availableShare.toFixed(1)}%</span>
                   </strong>{" "}
                   goes to shareholders,{" "}
                   <strong className="poppins-extrabold">
-                    <span>{teamShare}%</span>
+                    <span>{finalShareData.teamShare.toFixed(1)}%</span>
                   </strong> to the team (and artist).
                 </li>
                 <li className="poppins-regular my-4">
                   <strong className="poppins-extrabold">Merchandise:</strong> Sales from tour t-shirts, vinyl, and other related
                   merchandise will flow back to
                   the revenue pool <strong className="poppins-extrabold">
-                    <span>{availableShare}%</span>
+                    <span>{finalShareData.availableShare.toFixed(1)}%</span>
                   </strong>{" "}
                   goes to shareholders,{" "}
                   <strong className="poppins-extrabold">
-                    <span>{teamShare}%</span>
+                    <span>{finalShareData.teamShare.toFixed(1)}%</span>
                   </strong> to the team (and artist).
                 </li>
                 <li className="poppins-regular my-4">
@@ -287,22 +244,22 @@ export default function Page() {
                   </strong>{" "}
                   If the artist secures brand deals or partnerships during this
                   album's lifecycle, shareholders will benefit from the revenue pool <strong className="poppins-extrabold">
-                    <span>{availableShare}%</span>
+                    <span>{finalShareData.availableShare.toFixed(1)}%</span>
                   </strong>{" "}
                   goes to shareholders,{" "}
                   <strong className="poppins-extrabold">
-                    <span>{teamShare}%</span>
+                    <span>{finalShareData.teamShare.toFixed(1)}%</span>
                   </strong> to the team (and artist).
                 </li>
                 <li className="poppins-regular my-4">
                   <strong className="poppins-extrabold">Tour revenue:</strong>{" "}
                   Every ticket sold for performances during this album's lifecycle will
                   contribute to the pool <strong className="poppins-extrabold">
-                    <span>{availableShare}%</span>
+                    <span>{finalShareData.availableShare.toFixed(1)}%</span>
                   </strong>{" "}
                   goes to shareholders,{" "}
                   <strong className="poppins-extrabold">
-                    <span>{teamShare}%</span>
+                    <span>{finalShareData.teamShare.toFixed(1)}%</span>
                   </strong> to the team (and artist).
                 </li>
                 <li className="poppins-regular my-4">
@@ -460,11 +417,32 @@ export default function Page() {
               <CardTitle className="text-center text-2xl">Share Distribution</CardTitle>
             </CardHeader>
             <p className="text-center poppins-regular">
-              You own <span>{yourShare}%</span> of the total shares.
+              You own <span>{finalShareData.yourShare.toFixed(4)}%</span> of the total shares.
             </p>
             <CardContent className="flex flex-col items-center gap-4">
-              <ShareChart yourShare={yourShare} soldShare={soldShare} availableShare={availableShare} />
-              <ConnectButton />
+              {USE_STARKNET ? (
+                <>
+                  <ShareChartStarknet />
+                  <div className="flex gap-4">
+                    <ShareModalStarknet
+                      totalShare={100}
+                      yourShare={finalShareData.yourShare}
+                      crypto={crypto}
+                      onCryptoChange={setCrypto}
+                    />
+                    <ConnectButton />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <ShareChart
+                    yourShare={finalShareData.yourShare}
+                    soldShare={finalShareData.soldShare}
+                    availableShare={finalShareData.availableShare}
+                  />
+                  <ConnectButton />
+                </>
+              )}
             </CardContent>
           </Card>
         </section>

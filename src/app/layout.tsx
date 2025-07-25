@@ -4,13 +4,14 @@ import "./globals.css";
 import Nav from "@components/Nav";
 import { headers } from 'next/headers'
 import AppKitProvider from "@context/AppKitProvider";
+import { StarknetAppProvider } from "@context/StarknetKitProvider";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "Big Inc - Artist Onchain",
   description: "Welcome to my body of work",
   openGraph: {
-    images: [{ url: "https://bigincognito.vercel.app/assets/img/inc-the-god.jpg"}],
+    images: [{ url: "https://bigincognito.vercel.app/assets/img/inc-the-god.jpg" }],
     description: "Big Inc is a multidisciplinary creative artist onchain.",
     title: "Big Inc - Artist Onchain",
     url: "https://www.bigincognito.com"
@@ -52,9 +53,11 @@ export default function RootLayout({
       <body className="bg-darkBg bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))] w-vw flex flex-col h-dvh overflow-hidden relative">
         <Nav />
         <main className="grow custom-scrollbar overflow-auto overflow-x-hidden">
-          <AppKitProvider cookies={cookies}>
-            {children}
-          </AppKitProvider>
+          <StarknetAppProvider>
+            <AppKitProvider cookies={cookies}>
+              {children}
+            </AppKitProvider>
+          </StarknetAppProvider>
         </main>
         <Toaster />
       </body>
