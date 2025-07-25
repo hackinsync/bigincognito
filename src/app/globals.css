@@ -2,6 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Markdown Styles */
+.prose {
+  color: inherit;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: inherit;
+  font-weight: inherit;
+}
+
+.prose p {
+  color: inherit;
+  margin-bottom: 1rem;
+}
+
+.prose ul,
+.prose ol {
+  color: inherit;
+  margin-bottom: 1rem;
+}
+
+.prose li {
+  color: inherit;
+}
+
+.prose strong {
+  color: inherit;
+  font-weight: inherit;
+}
+
+.prose em {
+  color: inherit;
+  font-style: inherit;
+}
+
+.prose code {
+  color: inherit;
+  background-color: inherit;
+  padding: inherit;
+  border-radius: inherit;
+  font-family: inherit;
+}
+
+.prose pre {
+  color: inherit;
+  background-color: inherit;
+  padding: inherit;
+  border-radius: inherit;
+  overflow: inherit;
+}
+
+.prose blockquote {
+  color: inherit;
+  border-left-color: inherit;
+  padding-left: inherit;
+}
+
+.prose a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+.prose table {
+  color: inherit;
+}
+
+.prose th,
+.prose td {
+  color: inherit;
+  border-color: inherit;
+  padding: inherit;
+}
+
 @font-face {
   font-family: PrimaryFont;
   src: url(/assets/font/NeueMachina/NeueMachina-Regular.otf);

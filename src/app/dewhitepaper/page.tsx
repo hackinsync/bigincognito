@@ -19,6 +19,7 @@ import { toast } from '@components/ui/use-toast';
 import { useAppKit } from '@reown/appkit/react'
 import { WalletProvider } from '@context/WalletContext';
 import ConnectButton from '@components/ConnectButton';
+import Link from 'next/link';
 
 const config = createConfig({
   chains: [polygon],
@@ -469,6 +470,15 @@ export default function Page() {
           </Card>
         </section>
         <p className="w-full text-center poppins-regular text-sm text-[#A8AEB9] my-3 p-5"><strong className="poppins-extrabold text-[#A8AEB9]">Disclosure:</strong> Not Financial Advice (NFA). But we are a community-driven project, and we are building this as a template to setup a proven rebel label on-chain with our integrity & reputation which we hold dearly to this becoming a successful story. We are not selling shares to the public, but to our community, and anyone who is willing to join our community. Feel free to join our community and be part of this trailblazing journey.</p>
+        
+        {/* Expectations Link */}
+        <div className="w-full text-center py-8">
+          <Link href="/dewhitepaper/expectations">
+            <Button variant="outline" className="text-ourWhite px-10 rounded-none bg-[transparent] border-gray-600 font-extralight font-lighten tracking-widest hover:border-gray-500 transition-all duration-200 ease-in-out hover:scale-[1.02]">
+              🗳️ View Community Expectations
+            </Button>
+          </Link>
+        </div>
       </main>
     </>
   );
