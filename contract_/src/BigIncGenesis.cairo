@@ -20,6 +20,21 @@ pub trait IBigIncGenesis<TContractState> {
     fn get_shares_sold(self: @TContractState) -> u256;
     fn is_presale_active(self: @TContractState) -> bool;
 
+    fn request_withdrawal(
+        ref self: TContractState,
+        token_address: ContractAddress,
+        amount: u256,
+        milestone_uri: ByteArray,
+        deadline_timestamp: u64,
+    ) -> felt252;
+    fn trigger_vote_on_expectation(ref self: TContractState, withdrawal_hash: felt252);
+    fn vote_on_milestone(ref self: TContractState, withdrawal_hash: felt252, met_expectation: bool);
+
+    fn get_withdrawal_request(self: @TContractState, withdrawal_hash: felt252) -> WithdrawalRequest;
+    fn get_vote_result(self: @TContractState, withdrawal_hash: felt252) -> VoteResult;
+    fn has_voted(self: @TContractState, withdrawal_hash: felt252, voter: ContractAddress) -> bool;
+    fn execute_withdrawal_after_vote(ref self: TContractState, withdrawal_hash: felt252);
+
     // Owner functions
     fn withdraw(ref self: TContractState, token_address: ContractAddress, amount: u256);
     fn seize_shares(ref self: TContractState, shareholder: ContractAddress);
@@ -47,8 +62,38 @@ pub trait IBigIncGenesis<TContractState> {
     fn get_partner_token_rate(self: @TContractState, token_address: ContractAddress) -> u256;
 }
 
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct WithdrawalRequest {
+    pub requester: ContractAddress,
+    pub token_address: ContractAddress,
+    pub amount: u256,
+    pub milestone_uri: ByteArray,
+    pub deadline_timestamp: u64,
+    pub request_timestamp: u64,
+    pub is_executed: bool,
+}
+
+#[derive(Drop, Serde, starknet::Store, Copy)]
+pub struct VoteState {
+    pub is_active: bool,
+    pub start_timestamp: u64,
+    pub end_timestamp: u64,
+    pub total_votes_for: u256,
+    pub total_votes_against: u256,
+    pub total_voting_power: u256,
+}
+
+#[derive(Drop, Serde, starknet::Store, Copy)]
+pub struct VoteResult {
+    pub vote_state: VoteState,
+    pub met_expectation: bool,
+    pub participation_rate: u256,
+}
+
 #[starknet::contract]
 pub mod BigIncGenesis {
+    use core::num::traits::Zero;
+    use core::poseidon::poseidon_hash_span;
     use core::traits::Into;
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::security::pausable::PausableComponent;
@@ -59,7 +104,7 @@ pub mod BigIncGenesis {
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
-    use super::IBigIncGenesis;
+    use super::{IBigIncGenesis, VoteResult, VoteState, WithdrawalRequest};
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: PausableComponent, storage: pausable, event: PausableEvent);
@@ -105,11 +150,19 @@ pub mod BigIncGenesis {
         shareholder_count: u32,
         // Partner token rates (tokens required for 1 full share)
         partner_token_rates: Map<ContractAddress, u256>,
+        // Withdrawal requests
+        withdrawal_requests: Map<felt252, WithdrawalRequest>,
+        // Vote states
+        vote_states: Map<felt252, VoteState>,
+        // Individual votes (withdrawal_hash -> voter -> has_voted)
+        individual_votes: Map<(felt252, ContractAddress), bool>,
+        // Vote duration in seconds (default 7 days)
+        vote_duration: u64,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
+    pub enum Event {
         #[flat]
         OwnableEvent: OwnableComponent::Event,
         #[flat]
@@ -125,14 +178,17 @@ pub mod BigIncGenesis {
         Withdrawn: Withdrawn,
         PartnerShareCapSet: PartnerShareCapSet,
         PartnerShareMinted: PartnerShareMinted,
+        WithdrawalRequested: WithdrawalRequested,
+        VoteTriggered: VoteTriggered,
+        VoteVoted: VoteVoted,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct ShareMinted {
+    pub struct ShareMinted {
         #[key]
-        buyer: ContractAddress,
-        shares_bought: u256,
-        amount: u256,
+        pub buyer: ContractAddress,
+        pub shares_bought: u256,
+        pub amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -193,6 +249,32 @@ pub mod BigIncGenesis {
         rate: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct WithdrawalRequested {
+        #[key]
+        withdrawal_hash: felt252,
+        requester: ContractAddress,
+        token_address: ContractAddress,
+        amount: u256,
+        milestone_uri: ByteArray,
+        deadline_timestamp: u64,
+        request_timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct VoteTriggered {
+        #[key]
+        pub withdrawal_hash: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct VoteVoted {
+        #[key]
+        pub withdrawal_hash: felt252,
+        pub voter: ContractAddress,
+        pub met_expectation: bool,
+    }
+
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -221,6 +303,9 @@ pub mod BigIncGenesis {
         self.is_shareholder_map.write(owner, true);
         self.shareholder_addresses.write(0, owner);
         self.shareholder_count.write(1);
+
+        // Initialize vote duration to 7 days
+        self.vote_duration.write(604800);
     }
 
     #[abi(embed_v0)]
@@ -592,6 +677,243 @@ pub mod BigIncGenesis {
         /// access control
         fn renounce_owner(ref self: ContractState) {
             self.ownable.renounce_ownership();
+        }
+
+        fn request_withdrawal(
+            ref self: ContractState,
+            token_address: ContractAddress,
+            amount: u256,
+            milestone_uri: ByteArray,
+            deadline_timestamp: u64,
+        ) -> felt252 {
+            self.ownable.assert_only_owner();
+            self.pausable.assert_not_paused();
+            self.reentrancy_guard.start();
+
+            let caller = get_caller_address();
+            let current_timestamp: u64 = get_block_timestamp();
+
+            assert(deadline_timestamp > current_timestamp, 'Deadline must be in future');
+            self._validate_token(token_address);
+
+            // Create a simple hash for the withdrawal request
+            let withdrawal_hash = poseidon_hash_span(
+                array![
+                    caller.into(),
+                    token_address.into(),
+                    amount.low.into(),
+                    amount.high.into(),
+                    current_timestamp.into(),
+                ]
+                    .span(),
+            );
+
+            let existing_request = self.withdrawal_requests.read(withdrawal_hash);
+            assert(existing_request.requester.is_zero(), 'Withdrawal request exists');
+
+            let request_timestamp: u64 = current_timestamp;
+            let new_request = WithdrawalRequest {
+                requester: caller,
+                token_address,
+                amount,
+                milestone_uri: milestone_uri.clone(),
+                deadline_timestamp,
+                request_timestamp,
+                is_executed: false,
+            };
+            self.withdrawal_requests.write(withdrawal_hash, new_request);
+
+            self
+                .emit(
+                    Event::WithdrawalRequested(
+                        WithdrawalRequested {
+                            withdrawal_hash,
+                            requester: caller,
+                            token_address,
+                            amount,
+                            milestone_uri,
+                            deadline_timestamp,
+                            request_timestamp,
+                        },
+                    ),
+                );
+
+            self.reentrancy_guard.end();
+            withdrawal_hash
+        }
+
+        fn trigger_vote_on_expectation(ref self: ContractState, withdrawal_hash: felt252) {
+            self.pausable.assert_not_paused();
+
+            let request = self.withdrawal_requests.read(withdrawal_hash);
+            assert(!request.requester.is_zero(), 'Withdrawal request not found');
+            assert(!request.is_executed, 'Already executed');
+            assert(request.deadline_timestamp <= get_block_timestamp(), 'Deadline not reached');
+
+            let existing_vote = self.vote_states.read(withdrawal_hash);
+            assert(!existing_vote.is_active, 'Vote already active');
+
+            let current_timestamp: u64 = get_block_timestamp();
+            let vote_duration = self.vote_duration.read();
+            let new_vote_state = VoteState {
+                is_active: true,
+                start_timestamp: current_timestamp,
+                end_timestamp: current_timestamp + vote_duration,
+                total_votes_for: 0,
+                total_votes_against: 0,
+                total_voting_power: 0,
+            };
+            self.vote_states.write(withdrawal_hash, new_vote_state);
+
+            self.emit(Event::VoteTriggered(VoteTriggered { withdrawal_hash }));
+        }
+
+        fn vote_on_milestone(
+            ref self: ContractState, withdrawal_hash: felt252, met_expectation: bool,
+        ) {
+            let vote_state = self.vote_states.read(withdrawal_hash);
+            assert(vote_state.is_active, 'Voting not active');
+            assert(vote_state.end_timestamp >= get_block_timestamp(), 'Voting ended');
+
+            let voter = get_caller_address();
+
+            let has_voted = self.individual_votes.read((withdrawal_hash, voter));
+            assert(!has_voted, 'Already voted');
+
+            // Verify voter is a shareholder and get their voting power
+            let voting_power = self.shareholders.read(voter);
+            assert(voting_power > 0, 'No voting power');
+
+            self.individual_votes.write((withdrawal_hash, voter), true);
+
+            let mut updated_vote_state = vote_state;
+            updated_vote_state.total_voting_power += voting_power;
+
+            if met_expectation {
+                updated_vote_state.total_votes_for += voting_power;
+            } else {
+                updated_vote_state.total_votes_against += voting_power;
+            }
+
+            self.vote_states.write(withdrawal_hash, updated_vote_state);
+
+            self.emit(Event::VoteVoted(VoteVoted { withdrawal_hash, voter, met_expectation }));
+        }
+
+        fn get_withdrawal_request(
+            self: @ContractState, withdrawal_hash: felt252,
+        ) -> WithdrawalRequest {
+            self.withdrawal_requests.read(withdrawal_hash)
+        }
+
+        fn get_vote_result(self: @ContractState, withdrawal_hash: felt252) -> VoteResult {
+            let vote_state = self.vote_states.read(withdrawal_hash);
+
+            // Calculate total possible voting power (all shareholders)
+            let total_shares_count = self.shareholder_count.read();
+            let mut total_possible_voting_power: u256 = 0;
+            let mut i = 0;
+            while i < total_shares_count {
+                let shareholder = self.shareholder_addresses.read(i);
+                if self.is_shareholder_map.read(shareholder) {
+                    total_possible_voting_power += self.shareholders.read(shareholder);
+                }
+                i += 1;
+            }
+
+            let participation_rate = if total_possible_voting_power > 0 {
+                (vote_state.total_voting_power * 10000_u256) / total_possible_voting_power
+            } else {
+                0_u256
+            };
+
+            VoteResult {
+                vote_state,
+                met_expectation: vote_state.total_votes_for > vote_state.total_votes_against,
+                participation_rate,
+            }
+        }
+
+        fn has_voted(
+            self: @ContractState, withdrawal_hash: felt252, voter: ContractAddress,
+        ) -> bool {
+            self.individual_votes.read((withdrawal_hash, voter))
+        }
+
+        fn execute_withdrawal_after_vote(ref self: ContractState, withdrawal_hash: felt252) {
+            self.ownable.assert_only_owner();
+            self.reentrancy_guard.start();
+
+            let mut request = self.withdrawal_requests.read(withdrawal_hash);
+            assert(!request.requester.is_zero(), 'Withdrawal request not found');
+            assert(!request.is_executed, 'Already executed');
+
+            let vote_state = self.vote_states.read(withdrawal_hash);
+            assert(
+                !vote_state.is_active || vote_state.end_timestamp < get_block_timestamp(),
+                'Voting still active',
+            );
+
+            // Check if the vote passed (more votes for than against)
+            assert(
+                vote_state.total_votes_for > vote_state.total_votes_against, 'Vote did not pass',
+            );
+
+            // Minimum participation requirement (e.g., at least 25% of voting power participated)
+            let total_shares_count = self.shareholder_count.read();
+            let mut total_possible_voting_power: u256 = 0;
+            let mut i = 0;
+            while i < total_shares_count {
+                let shareholder = self.shareholder_addresses.read(i);
+                if self.is_shareholder_map.read(shareholder) {
+                    total_possible_voting_power += self.shareholders.read(shareholder);
+                }
+                i += 1;
+            }
+
+            let participation_rate = if total_possible_voting_power > 0 {
+                (vote_state.total_voting_power * 10000_u256) / total_possible_voting_power
+            } else {
+                0_u256
+            };
+
+            // Require at least 25% participation (2500 out of 10000)
+            assert(participation_rate >= 2500, 'Insufficient participation');
+
+            // Execute the withdrawal
+            let token = IERC20Dispatcher { contract_address: request.token_address };
+            let contract_address = get_contract_address();
+            assert(token.balance_of(contract_address) >= request.amount, 'Insufficient balance');
+
+            let owner = self.ownable.owner();
+            token.transfer(owner, request.amount);
+
+            // Mark as executed - create new struct with updated field
+            let updated_request = WithdrawalRequest {
+                requester: request.requester,
+                token_address: request.token_address,
+                amount: request.amount,
+                milestone_uri: request.milestone_uri.clone(),
+                deadline_timestamp: request.deadline_timestamp,
+                request_timestamp: request.request_timestamp,
+                is_executed: true,
+            };
+            self.withdrawal_requests.write(withdrawal_hash, updated_request);
+
+            let ts: u256 = get_block_timestamp().into();
+            self
+                .emit(
+                    Event::Withdrawn(
+                        Withdrawn {
+                            token_address: request.token_address,
+                            amount: request.amount,
+                            owner,
+                            timestamp: ts,
+                        },
+                    ),
+                );
+
+            self.reentrancy_guard.end();
         }
     }
 
