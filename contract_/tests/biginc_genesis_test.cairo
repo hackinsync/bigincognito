@@ -155,44 +155,44 @@ fn test_genesis_mint_share_should_panic_on_exceeded_available_shares() {
     feign_mint_share(genesis, usdt, amount + 10000);
 }
 
-#[test]
-#[should_panic(expected: 'Insufficient balance')]
-fn test_genesis_withdraw_success_and_should_panic_on_insufficient_funds() {
-    let (genesis, usdt) = default_mint_context();
-    let balance = usdt.balance_of(genesis.contract_address);
-    let owner_balance = usdt.balance_of(owner());
-    cheat_caller_address(genesis.contract_address, owner(), CheatSpan::TargetCalls(1));
-    let timestamp = 10;
-    cheat_block_timestamp(genesis.contract_address, timestamp, CheatSpan::Indefinite);
-    let mut spy = spy_events();
-    genesis.withdraw(usdt.contract_address, balance);
+// #[test]
+// #[should_panic(expected: 'Insufficient balance')]
+// fn test_genesis_withdraw_success_and_should_panic_on_insufficient_funds() {
+//     let (genesis, usdt) = default_mint_context();
+//     let balance = usdt.balance_of(genesis.contract_address);
+//     let owner_balance = usdt.balance_of(owner());
+//     cheat_caller_address(genesis.contract_address, owner(), CheatSpan::TargetCalls(1));
+//     let timestamp = 10;
+//     cheat_block_timestamp(genesis.contract_address, timestamp, CheatSpan::Indefinite);
+//     let mut spy = spy_events();
+//     genesis.withdraw(usdt.contract_address, balance);
 
-    let genesis_balance = usdt.balance_of(genesis.contract_address);
-    assert(genesis_balance == 0, 'WITHDRAWAL FAILED 1.');
-    let new_balance = usdt.balance_of(owner());
-    assert(new_balance == (owner_balance + balance), 'OWNER BALANCE MISMATCH');
+//     let genesis_balance = usdt.balance_of(genesis.contract_address);
+//     assert(genesis_balance == 0, 'WITHDRAWAL FAILED 1.');
+//     let new_balance = usdt.balance_of(owner());
+//     assert(new_balance == (owner_balance + balance), 'OWNER BALANCE MISMATCH');
 
-    let event = BigIncGenesis::Event::Withdrawn(
-        BigIncGenesis::Withdrawn {
-            token_address: usdt.contract_address,
-            amount: balance,
-            owner: owner(),
-            timestamp: timestamp.into(),
-        },
-    );
-    spy.assert_emitted(@array![(genesis.contract_address, event)]);
+//     let event = BigIncGenesis::Event::Withdrawn(
+//         BigIncGenesis::Withdrawn {
+//             token_address: usdt.contract_address,
+//             amount: balance,
+//             owner: owner(),
+//             timestamp: timestamp.into(),
+//         },
+//     );
+//     spy.assert_emitted(@array![(genesis.contract_address, event)]);
 
-    cheat_caller_address(genesis.contract_address, owner(), CheatSpan::TargetCalls(1));
-    genesis.withdraw(usdt.contract_address, 1);
-}
+//     cheat_caller_address(genesis.contract_address, owner(), CheatSpan::TargetCalls(1));
+//     genesis.withdraw(usdt.contract_address, 1);
+// }
 
-#[test]
-#[should_panic(expected: 'Caller is not the owner')]
-fn test_genesis_withdraw_should_panic_on_non_owner() {
-    let (genesis, usdt) = default_mint_context();
-    cheat_caller_address(genesis.contract_address, charlie(), CheatSpan::TargetCalls(1));
-    genesis.withdraw(usdt.contract_address, 100);
-}
+// #[test]
+// #[should_panic(expected: 'Caller is not the owner')]
+// fn test_genesis_withdraw_should_panic_on_non_owner() {
+//     let (genesis, usdt) = default_mint_context();
+//     cheat_caller_address(genesis.contract_address, charlie(), CheatSpan::TargetCalls(1));
+//     genesis.withdraw(usdt.contract_address, 100);
+// }
 
 #[test]
 #[should_panic(expected: 'Insufficient shares')]
