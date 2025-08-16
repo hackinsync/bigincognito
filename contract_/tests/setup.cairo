@@ -2,11 +2,8 @@ use contract_::BigIncGenesis::IBigIncGenesisDispatcher;
 use core::result::ResultTrait;
 use openzeppelin::token::erc20::interface::IERC20Dispatcher;
 use openzeppelin::utils::serde::SerializedAppend;
-use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
-    stop_cheat_caller_address,
-};
-use starknet::{ContractAddress, contract_address_const};
+use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
+use starknet::ContractAddress;
 
 pub const OWNER: felt252 = 'owner';
 pub const USER1: felt252 = 'user1';
@@ -23,10 +20,9 @@ pub fn deploy_mock_erc20(
 ) -> ContractAddress {
     let contract = declare("MockERC20").unwrap().contract_class();
     let mut constructor_args = array![];
-    constructor_args.append_serde(recipient);
-    constructor_args.append_serde(name);
-    constructor_args.append_serde(symbol);
+
     constructor_args.append_serde(initial_supply);
+    constructor_args.append_serde(recipient);
 
     let (contract_address, _) = contract.deploy(@constructor_args).unwrap();
     contract_address
